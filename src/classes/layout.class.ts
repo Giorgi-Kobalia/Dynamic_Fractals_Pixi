@@ -50,6 +50,8 @@ export class Layout {
     this.container.addChild(this.drawwingContainer, this.allInputsContainer);
 
     this.allInputsContainer.position.set(400, 790);
+
+    this.drawwingContainer.sortableChildren = true;
   }
 
   drawAmountInput() {
@@ -228,7 +230,7 @@ export class Layout {
     const g = new Graphics();
     const color = this.depthToColor(depth);
 
-    g.fill({ color, alpha: 0.05 });
+    g.fill("transparent");
     g.stroke({ width: 1, color, alpha: 1 });
 
     g.moveTo(points[0].x, points[0].y);
@@ -241,14 +243,15 @@ export class Layout {
     g.stroke();
 
     this.drawwingContainer.addChild(g);
+    g.zIndex = depth;
   }
 
   depthToColor(depth: number): number {
-    const t = depth / this.maxDepth;
-    const r = Math.floor(200 + 55 * t);
-    const g = Math.floor(140 + 110 * t);
-    const b = Math.floor(0 + 30 * t);
-    return (r << 16) + (g << 8) + b;
+    const isEven = depth % 2 === 0;
+
+    // Золотой: #FFD700
+    // Зелёный: #228B22
+    return isEven ? 0x228b22 : 0xffd700;
   }
 
   reset() {
