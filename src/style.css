@@ -17,7 +17,7 @@ body {
 }
 
 #app canvas {
-  border: 1px solid gold;
+  border: 1px solid #ffd700;
   width: 100%;
   max-width: 1600px;
 }

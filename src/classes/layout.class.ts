@@ -55,7 +55,7 @@ export class Layout {
   }
 
   drawAmountInput() {
-    this.cornersBg.roundRect(0, 0, 150, 40, 8).fill("gold");
+    this.cornersBg.roundRect(0, 0, 150, 40, 8).fill("0xffd700");
     this.cornersBg.interactive = true;
 
     this.cornersText = new Text({
@@ -87,7 +87,7 @@ export class Layout {
   }
 
   drawDepthInput() {
-    this.depthBg.roundRect(0, 0, 150, 40, 8).fill("gold");
+    this.depthBg.roundRect(0, 0, 150, 40, 8).fill("0xffd700");
     this.depthBg.interactive = true;
 
     this.depthText = new Text({
@@ -121,7 +121,7 @@ export class Layout {
 
   drawBtn() {
     this.btnBg = new Graphics();
-    this.btnBg.roundRect(0, 0, 150, 40, 8).fill("gold");
+    this.btnBg.roundRect(0, 0, 150, 40, 8).fill("0x228b22");
 
     this.btnText = new Text({
       text: "DRAW",
