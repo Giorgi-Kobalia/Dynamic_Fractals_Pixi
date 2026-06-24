@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, Ticker } from "pixi.js";
+import { Container, Graphics, Rectangle, Text, Ticker } from "pixi.js";
 
 interface DrawTask {
   cx: number;
@@ -7,128 +7,237 @@ interface DrawTask {
   depth: number;
 }
 
+interface StepperOptions {
+  label: string;
+  min: number;
+  max: number;
+  initial: number;
+  onChange: (value: number) => void;
+}
+
+type ShapeMode = "polygon" | "star";
+
+interface ToggleOptions {
+  leftLabel: string;
+  rightLabel: string;
+  initial: ShapeMode;
+  onChange: (value: ShapeMode) => void;
+}
+
+const STEPPER_WIDTH = 180;
+const STEPPER_HEIGHT = 40;
+const STEPPER_BTN_SIZE = 34;
+const BTN_WIDTH = 150;
+const ROW_GAP = 18;
+const PANEL_PADDING = 22;
+
+const CORNERS_X = 0;
+const TOGGLE_X = CORNERS_X + STEPPER_WIDTH + ROW_GAP;
+const DEPTH_X = TOGGLE_X + STEPPER_WIDTH + ROW_GAP;
+const BTN_X = DEPTH_X + STEPPER_WIDTH + ROW_GAP;
+const CONTENT_WIDTH = BTN_X + BTN_WIDTH;
+const CONTENT_HEIGHT = STEPPER_HEIGHT;
+
+const PANEL_WIDTH = CONTENT_WIDTH + PANEL_PADDING * 2;
+const PANEL_HEIGHT = CONTENT_HEIGHT + PANEL_PADDING * 2;
+
+const DRAW_CENTER_X = 400;
+const DRAW_CENTER_Y = 425;
+const DRAW_RADIUS = 220;
+
 export class Layout {
   public container = new Container();
   public ticker = new Ticker();
 
-  public cornersBg = new Graphics();
-  public cornersText = new Text();
   public cornersInputContainer = new Container();
-
-  public depthBg = new Graphics();
-  public depthText = new Text();
   public depthInputContainer = new Container();
+  public shapeToggleContainer = new Container();
 
   public btnBg = new Graphics();
   public btnText = new Text();
   public btnContainer = new Container();
 
-  public allInputsContainer = new Container();
+  public uiContainer = new Container();
+
   public drawwingContainer = new Container();
 
   private taskQueue: DrawTask[] = [];
   private isDrawing = false;
   private maxDepth = 0;
   private cornersAmount = 0;
+  private shapeMode: ShapeMode = "polygon";
 
   init() {
-    this.drawAmountInput();
-    this.drawDepthInput();
-    this.drawBtn();
+    const panelBg = new Graphics()
+      .roundRect(0, 0, PANEL_WIDTH, PANEL_HEIGHT, 18)
+      .fill({ color: 0x000000, alpha: 0.4 })
+      .stroke({ width: 1, color: 0xffd700, alpha: 0.4 });
 
-    this.allInputsContainer.addChild(
+    this.cornersInputContainer = this.createStepper({
+      label: "CORNERS",
+      min: 3,
+      max: 12,
+      initial: 3,
+      onChange: (value) => (this.cornersAmount = value),
+    });
+    this.cornersAmount = 3;
+    this.cornersInputContainer.position.set(PANEL_PADDING + CORNERS_X, PANEL_PADDING);
+
+    this.depthInputContainer = this.createStepper({
+      label: "DEPTH",
+      min: 1,
+      max: 6,
+      initial: 1,
+      onChange: (value) => (this.maxDepth = value),
+    });
+    this.maxDepth = 1;
+    this.depthInputContainer.position.set(PANEL_PADDING + DEPTH_X, PANEL_PADDING);
+
+    this.shapeToggleContainer = this.createToggle({
+      leftLabel: "POLYGON",
+      rightLabel: "STAR",
+      initial: "polygon",
+      onChange: (mode) => (this.shapeMode = mode),
+    });
+    this.shapeToggleContainer.position.set(PANEL_PADDING + TOGGLE_X, PANEL_PADDING);
+
+    this.drawBtn();
+    this.btnContainer.position.set(PANEL_PADDING + BTN_X, PANEL_PADDING);
+
+    this.uiContainer.addChild(
+      panelBg,
       this.cornersInputContainer,
       this.depthInputContainer,
+      this.shapeToggleContainer,
       this.btnContainer
     );
+    this.uiContainer.pivot.set(PANEL_WIDTH / 2, PANEL_HEIGHT / 2);
 
-    this.allInputsContainer.pivot.set(
-      this.allInputsContainer.width / 2,
-      this.allInputsContainer.height / 2
-    );
-
-    this.container.addChild(this.drawwingContainer, this.allInputsContainer);
-
-    this.allInputsContainer.position.set(400, 790);
-
+    this.container.addChild(this.drawwingContainer);
     this.drawwingContainer.sortableChildren = true;
   }
 
-  drawAmountInput() {
-    this.cornersBg.roundRect(0, 0, 150, 40, 8).fill("0xffd700");
-    this.cornersBg.interactive = true;
+  private createStepperButton(label: string, x: number): Container {
+    const button = new Container();
+    const bg = new Graphics().roundRect(0, 0, STEPPER_BTN_SIZE, STEPPER_HEIGHT, 8).fill(0xffd700);
 
-    this.cornersText = new Text({
-      text: "CORNERS",
-      style: {
-        fontFamily: "Arial",
-        fontSize: 16,
-        fill: 0x000000,
-      },
+    const text = new Text({
+      text: label,
+      style: { fontFamily: "Arial", fontSize: 20, fill: 0x000000, fontWeight: "bold" },
     });
+    text.anchor.set(0.5);
+    text.position.set(STEPPER_BTN_SIZE / 2, STEPPER_HEIGHT / 2);
+    text.resolution = 2;
 
-    this.cornersText.anchor.set(0.5);
-    this.cornersText.position.set(
-      this.cornersBg.width / 2,
-      this.cornersBg.height / 2
-    );
+    button.addChild(bg, text);
+    button.x = x;
+    button.interactive = true;
+    button.cursor = "pointer";
 
-    this.cornersInputContainer.addChild(this.cornersBg, this.cornersText);
-
-    this.cornersInputContainer.interactive = true;
-
-    this.cornersInputContainer.on("pointerdown", () => {
-      const val = prompt("Enter number of corners:");
-      if (val) this.cornersText.text = val;
-      this.cornersAmount = parseInt(this.cornersText.text);
-    });
-
-    this.cornersText.resolution = 2;
+    return button;
   }
 
-  drawDepthInput() {
-    this.depthBg.roundRect(0, 0, 150, 40, 8).fill("0xffd700");
-    this.depthBg.interactive = true;
+  private createStepper(options: StepperOptions): Container {
+    const container = new Container();
+    let value = options.initial;
 
-    this.depthText = new Text({
-      text: "DEPTH",
-      style: {
-        fontFamily: "Arial",
-        fontSize: 16,
-        fill: 0x000000,
-      },
+    const valueBg = new Graphics().roundRect(
+      STEPPER_BTN_SIZE,
+      0,
+      STEPPER_WIDTH - STEPPER_BTN_SIZE * 2,
+      STEPPER_HEIGHT,
+      8
+    ).fill(0x1a1a1a);
+
+    const valueText = new Text({
+      text: `${options.label} ${value}`,
+      style: { fontFamily: "Arial", fontSize: 14, fill: 0xffd700 },
     });
+    valueText.anchor.set(0.5);
+    valueText.position.set(STEPPER_WIDTH / 2, STEPPER_HEIGHT / 2);
+    valueText.resolution = 2;
 
-    this.depthText.anchor.set(0.5);
-    this.depthText.position.set(
-      this.depthBg.width / 2,
-      this.depthBg.height / 2
-    );
+    const minusBtn = this.createStepperButton("-", 0);
+    const plusBtn = this.createStepperButton("+", STEPPER_WIDTH - STEPPER_BTN_SIZE);
 
-    this.depthInputContainer.x = 300;
-    this.depthInputContainer.addChild(this.depthBg, this.depthText);
+    const setValue = (next: number) => {
+      value = Math.min(options.max, Math.max(options.min, next));
+      valueText.text = `${options.label} ${value}`;
+      options.onChange(value);
+    };
 
-    this.depthInputContainer.interactive = true;
+    minusBtn.on("pointerup", () => setValue(value - 1));
+    plusBtn.on("pointerup", () => setValue(value + 1));
 
-    this.depthInputContainer.on("pointerdown", () => {
-      const val = prompt("Enter number of depth:");
-      if (val) this.depthText.text = val;
-      this.maxDepth = parseInt(this.depthText.text);
+    container.addChild(valueBg, valueText, minusBtn, plusBtn);
+
+    return container;
+  }
+
+  private createToggle(options: ToggleOptions): Container {
+    const container = new Container();
+    const halfWidth = STEPPER_WIDTH / 2;
+
+    const bg = new Graphics().roundRect(0, 0, STEPPER_WIDTH, STEPPER_HEIGHT, 8).fill(0x1a1a1a);
+    const highlight = new Graphics().roundRect(0, 0, halfWidth, STEPPER_HEIGHT, 8).fill(0xffd700);
+
+    const leftText = new Text({
+      text: options.leftLabel,
+      style: { fontFamily: "Arial", fontSize: 12, fill: 0xffffff, fontWeight: "bold" },
     });
+    leftText.anchor.set(0.5);
+    leftText.position.set(halfWidth / 2, STEPPER_HEIGHT / 2);
+    leftText.resolution = 2;
 
-    this.depthText.resolution = 2;
+    const rightText = new Text({
+      text: options.rightLabel,
+      style: { fontFamily: "Arial", fontSize: 12, fill: 0xffffff, fontWeight: "bold" },
+    });
+    rightText.anchor.set(0.5);
+    rightText.position.set(halfWidth + halfWidth / 2, STEPPER_HEIGHT / 2);
+    rightText.resolution = 2;
+
+    const leftHit = new Container();
+    leftHit.hitArea = new Rectangle(0, 0, halfWidth, STEPPER_HEIGHT);
+    leftHit.interactive = true;
+    leftHit.cursor = "pointer";
+
+    const rightHit = new Container();
+    rightHit.x = halfWidth;
+    rightHit.hitArea = new Rectangle(0, 0, halfWidth, STEPPER_HEIGHT);
+    rightHit.interactive = true;
+    rightHit.cursor = "pointer";
+
+    const setMode = (mode: ShapeMode) => {
+      highlight.x = mode === "polygon" ? 0 : halfWidth;
+      leftText.style.fill = mode === "polygon" ? 0x000000 : 0xffffff;
+      rightText.style.fill = mode === "star" ? 0x000000 : 0xffffff;
+      options.onChange(mode);
+    };
+
+    leftHit.on("pointerup", () => setMode("polygon"));
+    rightHit.on("pointerup", () => setMode("star"));
+
+    container.addChild(bg, highlight, leftText, rightText, leftHit, rightHit);
+    setMode(options.initial);
+
+    return container;
   }
 
   drawBtn() {
     this.btnBg = new Graphics();
-    this.btnBg.roundRect(0, 0, 150, 40, 8).fill("0x228b22");
+    this.btnBg
+      .roundRect(0, 0, BTN_WIDTH, STEPPER_HEIGHT, 8)
+      .fill(0x228b22)
+      .stroke({ width: 1, color: 0xffd700, alpha: 0.6 });
 
     this.btnText = new Text({
       text: "DRAW",
       style: {
         fontFamily: "Arial",
-        fontSize: 20,
-        fill: 0x000000,
+        fontSize: 18,
+        fontWeight: "bold",
+        fill: 0xffffff,
       },
     });
 
@@ -137,13 +246,11 @@ export class Layout {
 
     this.btnContainer = new Container();
 
-    this.btnContainer.x = 150;
-    this.btnContainer.y = 60;
-
     this.btnContainer.addChild(this.btnBg, this.btnText);
     this.btnContainer.interactive = true;
+    this.btnContainer.cursor = "pointer";
 
-    this.btnContainer.on("pointerdown", () => {
+    this.btnContainer.on("pointerup", () => {
       if (!this.isDrawing && this.cornersAmount && this.maxDepth) {
         this.startDrawing();
       } else if (this.isDrawing) {
@@ -160,9 +267,9 @@ export class Layout {
     this.taskQueue = [];
 
     this.taskQueue.push({
-      cx: 400,
-      cy: 380,
-      radius: 220,
+      cx: DRAW_CENTER_X,
+      cy: DRAW_CENTER_Y,
+      radius: DRAW_RADIUS,
       depth: this.maxDepth,
     });
 
@@ -183,13 +290,10 @@ export class Layout {
     const { cx, cy, radius, depth } = task;
     this.btnText.text = "RESET";
 
-    const points = this.createStartPoints(
-      cx,
-      cy,
-      radius,
-      this.cornersAmount,
-      0.5
-    );
+    const points =
+      this.shapeMode === "star"
+        ? this.createStarPoints(cx, cy, radius, this.cornersAmount, 0.5)
+        : this.createPolygonPoints(cx, cy, radius, this.cornersAmount);
     this.drawPolygon(points, depth);
 
     if (depth > 1) {
@@ -204,7 +308,26 @@ export class Layout {
     }
   }
 
-  createStartPoints(
+  createPolygonPoints(
+    cx: number,
+    cy: number,
+    radius: number,
+    sides: number
+  ): { x: number; y: number }[] {
+    const step = (Math.PI * 2) / sides;
+    const points: { x: number; y: number }[] = [];
+
+    for (let i = 0; i < sides; i++) {
+      const angle = i * step - Math.PI / 2;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      points.push({ x, y });
+    }
+
+    return points;
+  }
+
+  createStarPoints(
     cx: number,
     cy: number,
     radius: number,
@@ -249,17 +372,11 @@ export class Layout {
   depthToColor(depth: number): number {
     const isEven = depth % 2 === 0;
 
-    // Золотой: #FFD700
-    // Зелёный: #228B22
     return isEven ? 0x228b22 : 0xffd700;
   }
 
   reset() {
     this.drawwingContainer.removeChildren();
-    this.cornersAmount = 0;
-    this.cornersText.text = 0;
-    this.maxDepth = 0;
-    this.depthText.text = 0;
     this.ticker.stop();
     this.ticker.remove(this.processNextTask, this);
     this.taskQueue = [];
